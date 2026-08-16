@@ -533,11 +533,6 @@ function Invoke-UvForUser {
         $ErrorActionPreference = $prevEAP
     }
 }
-
-# iex (irm ...) evaluates top-to-bottom, so this must run after the functions
-# above are defined — not during early path resolution.
-Remove-ForeignHermesFromSessionPath
-
 function Discard-LockfileChurn {
     param([string]$Repo = $InstallDir)
 
@@ -4756,6 +4751,11 @@ function Main {
 # structured JSON error frame instead of a bare exception.
 
 try {
+    # Must stay inside this try (after all function defs). A top-level call
+    # breaks `iex (irm ...)` because PowerShell looks the name up before the
+    # function exists.
+    Remove-ForeignHermesFromSessionPath
+
     if ($Ensure -ne "") {
         if ($PSBoundParameters.ContainsKey("Stage")) {
             Write-Err "Cannot use -Ensure and -Stage simultaneously"
