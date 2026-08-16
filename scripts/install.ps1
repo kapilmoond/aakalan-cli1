@@ -30,8 +30,8 @@ param(
     # existing tree pass -ForceCommit.
     [switch]$ForceCommit,
     [string]$Tag = "",
-    [string]$HermesHome = $(if ($env:AAKALAN_HOME) { $env:AAKALAN_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\aakalan" }),
-    [string]$InstallDir = $(if ($env:AAKALAN_HOME) { "$env:AAKALAN_HOME\aakalan-cli" } elseif ($env:HERMES_HOME) { "$env:HERMES_HOME\aakalan-cli" } else { "$env:LOCALAPPDATA\aakalan\aakalan-cli" }),
+    [string]$HermesHome = $(if ($env:AAKALAN_HOME) { $env:AAKALAN_HOME } else { "$env:LOCALAPPDATA\aakalan" }),
+    [string]$InstallDir = $(if ($env:AAKALAN_HOME) { "$env:AAKALAN_HOME\aakalan-cli" } else { "$env:LOCALAPPDATA\aakalan\aakalan-cli" }),
 
     # --- Stage protocol (additive; default invocation behaves as before) ----
     # See the "Stage protocol" section near the bottom of the file for the
@@ -336,14 +336,14 @@ if ($PSBoundParameters.ContainsKey('HermesHome')) {
     $HermesHome = ConvertTo-LongPath $HermesHome
 } else {
     $HermesHome = ConvertTo-LongPath $(
-        if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" }
+        if ($env:AAKALAN_HOME) { $env:AAKALAN_HOME } else { "$env:LOCALAPPDATA\aakalan" }
     )
 }
 if ($PSBoundParameters.ContainsKey('InstallDir')) {
     $InstallDir = ConvertTo-LongPath $InstallDir
 } else {
     $InstallDir = ConvertTo-LongPath $(
-        if ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }
+        if ($env:AAKALAN_HOME) { "$env:AAKALAN_HOME\aakalan-cli" } else { "$env:LOCALAPPDATA\aakalan\aakalan-cli" }
     )
 }
 if ($script:NormalizedProfilePaths) {
@@ -2473,7 +2473,7 @@ function Install-Venv {
                 Write-Warn "Could not enumerate gateway scheduled tasks: $($_.Exception.Message)"
             }
             # The launcher CLI (hermes.exe) plus its child tree.
-            & taskkill /F /T /IM hermes.exe /FI "PID ne $myPid" 2>$null | Out-Null
+            & taskkill /F /T /IM aakalan.exe /FI "PID ne $myPid" 2>$null | Out-Null
             # taskkill /IM hermes.exe is NOT enough: the gateway/agent that a
             # scheduled task or watchdog autostarts runs as
             # `pythonw.exe -m hermes_cli.main gateway run` straight out of
@@ -2978,23 +2978,16 @@ print(','.join(scripts))
 }
 
 function Set-PathVariable {
-    Write-Info "Setting up hermes command..."
+    Write-Info "Setting up aakalan command..."
     
     if ($NoVenv) {
         $hermesBin = "$InstallDir"
     } else {
-        # Expose ONLY the hermes launchers on PATH -- never the whole
-        # venv\Scripts directory. venv\Scripts contains python.exe /
-        # pythonw.exe / pip.exe, and putting it on the user PATH silently
-        # hijacks the `python` command in every terminal on the machine
-        # (#83797): unrelated projects start resolving python to Hermes'
-        # runtime interpreter. A dedicated bin dir with copies of the
-        # launcher exes keeps `hermes` globally available without
-        # shadowing anything. (Launcher exes embed the venv interpreter
-        # path, so they work from any location and survive updates.)
+        # Expose ONLY Aakalan launchers on PATH. Never put hermes.exe here —
+        # that would replace the official Hermes CLI if both are installed.
         $hermesBin = "$InstallDir\bin"
         New-Item -ItemType Directory -Force -Path $hermesBin | Out-Null
-        foreach ($launcher in @("hermes.exe", "hermes-acp.exe")) {
+        foreach ($launcher in @("aakalan.exe", "aakalan-cli.exe", "aakalan-acp.exe")) {
             $src = "$InstallDir\venv\Scripts\$launcher"
             if (Test-Path $src) {
                 Copy-Item -Force $src "$hermesBin\$launcher"
@@ -3025,20 +3018,16 @@ function Set-PathVariable {
         Write-Info "PATH already configured"
     }
     
-    # Set HERMES_HOME so the Python code finds config/data in the right place.
-    # Only needed on Windows where we install to %LOCALAPPDATA%\hermes instead
-    # of the Unix default ~/.hermes
-    $currentHermesHome = [Environment]::GetEnvironmentVariable("HERMES_HOME", "User")
-    if (-not $currentHermesHome -or $currentHermesHome -ne $HermesHome) {
-        [Environment]::SetEnvironmentVariable("HERMES_HOME", $HermesHome, "User")
-        Write-Success "Set HERMES_HOME=$HermesHome"
-    }
+    # Keep Aakalan separate from official Hermes.
+    # Never overwrite User HERMES_HOME — that belongs to Hermes CLI.
+    [Environment]::SetEnvironmentVariable("AAKALAN_HOME", $HermesHome, "User")
+    $env:AAKALAN_HOME = $HermesHome
     $env:HERMES_HOME = $HermesHome
     
     # Update current session
     $env:Path = "$hermesBin;$env:Path"
     
-    Write-Success "hermes command ready"
+    Write-Success "aakalan command ready (Hermes CLI left unchanged)"
 }
 
 function Write-BootstrapMarker {

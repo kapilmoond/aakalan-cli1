@@ -68,7 +68,7 @@ def _hermes_home_from_env() -> Path:
     scope rather than a per-task profile.  Shared by :func:`get_hermes_home`
     and :func:`get_process_hermes_home` so the two never drift.
     """
-    val = os.environ.get("HERMES_HOME", "").strip()
+    val = (os.environ.get("AAKALAN_HOME") or "").strip()
     if val:
         return Path(val)
     return _get_platform_default_hermes_home()
