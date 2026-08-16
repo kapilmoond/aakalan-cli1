@@ -351,7 +351,6 @@ if ($script:NormalizedProfilePaths) {
     # this bug class, and the whole question once a short alias is in play.
     Write-PathDiag "resolved install paths: AakalanHome=$HermesHome InstallDir=$InstallDir"
 }
-Remove-ForeignHermesFromSessionPath
 
 # Captured here, where the values are final, and emitted from the entry-point
 # dispatch at the bottom (alongside -ProtocolVersion / -Manifest) so
@@ -534,6 +533,11 @@ function Invoke-UvForUser {
         $ErrorActionPreference = $prevEAP
     }
 }
+
+# iex (irm ...) evaluates top-to-bottom, so this must run after the functions
+# above are defined — not during early path resolution.
+Remove-ForeignHermesFromSessionPath
+
 function Discard-LockfileChurn {
     param([string]$Repo = $InstallDir)
 
