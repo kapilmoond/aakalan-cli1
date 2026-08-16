@@ -161,7 +161,7 @@ function Write-PathDiag {
     # produced nothing there under a non-interactive host.
     param([string]$Message)
     if ($ShowResolvedPaths) { return }
-    [Console]::Error.WriteLine("[hermes] $Message")
+    [Console]::Error.WriteLine("[aakalan] $Message")
 }
 
 function Get-LongProfileRoot {
@@ -349,7 +349,7 @@ if ($PSBoundParameters.ContainsKey('InstallDir')) {
 if ($script:NormalizedProfilePaths) {
     # Which paths the install actually settled on. Absent from every report of
     # this bug class, and the whole question once a short alias is in play.
-    Write-PathDiag "resolved install paths: HermesHome=$HermesHome InstallDir=$InstallDir"
+    Write-PathDiag "resolved install paths: AakalanHome=$HermesHome InstallDir=$InstallDir"
 }
 
 # Captured here, where the values are final, and emitted from the entry-point
@@ -971,7 +971,7 @@ function Update-ManagedNpm {
     # in-place upgrade would hit WinError 5 (Access denied) on npm.cmd
     # (#80926).  Defer; the next update with the app closed retries.
     if (Test-ManagedNodeInUse $NodeDir) {
-        Write-Warn "Hermes-managed Node.js is in use by a running app; skipping the bundled npm upgrade (applies on a later update with the app closed)."
+        Write-Warn "Aakalan-managed Node.js is in use by a running app; skipping the bundled npm upgrade (applies on a later update with the app closed)."
         return $false
     }
 
@@ -1309,7 +1309,7 @@ function New-GitBashAslrFailureReason {
         "Open PowerShell as Administrator and run:"
         "`$gitRoot = '$escapedRoot'"
         'Get-Item "$gitRoot\bin\bash.exe", "$gitRoot\usr\bin\*.exe" -ErrorAction SilentlyContinue | ForEach-Object { Set-ProcessMitigation -Name $_.FullName -Disable ForceRelocateImages }'
-        "Then rerun Hermes setup. If the override is blocked or later re-applied, ask your Windows administrator to allow this per-program exception."
+        "Then rerun Aakalan setup. If the override is blocked or later re-applied, ask your Windows administrator to allow this per-program exception."
     ) -join [Environment]::NewLine
 }
 
@@ -1405,7 +1405,7 @@ function Install-Git {
         $gitVerTag = "$gitVer.windows.1"
 
         if ($arch -eq "32-bit-mingit") {
-            Write-Warn "32-bit Windows detected -- PortableGit is 64-bit only.  Installing MinGit 32-bit as a last resort; bash-dependent Hermes features (terminal tool, agent-browser) will not work on this machine."
+            Write-Warn "32-bit Windows detected -- PortableGit is 64-bit only.  Installing MinGit 32-bit as a last resort; bash-dependent Aakalan features (terminal tool, agent-browser) will not work on this machine."
             $assetName    = "MinGit-$gitVer-32-bit.zip"
             $downloadIsZip = $true
         } elseif ($arch -eq "arm64") {
@@ -1502,7 +1502,7 @@ function Install-Git {
         Write-Err "Could not install portable Git: $_"
         Write-Info ""
         Write-Info "Fallback: install Git manually from https://git-scm.com/download/win"
-        Write-Info "then re-run this installer.  Hermes needs Git Bash on Windows to run"
+        Write-Info "then re-run this installer.  Aakalan needs Git Bash on Windows to run"
         Write-Info "shell commands (same as Claude Code and other coding agents)."
         return $false
     }
@@ -1553,13 +1553,13 @@ function Set-GitBashEnvVar {
             [Environment]::SetEnvironmentVariable("HERMES_GIT_BASH_PATH", $candidate, "User")
             $env:HERMES_GIT_BASH_PATH = $candidate
             $script:GitBashPath = $candidate
-            Write-Info "Set HERMES_GIT_BASH_PATH=$candidate"
+            Write-Info "Git Bash ready: $candidate"
             return
         }
     }
 
-    Write-Warn "Could not locate bash.exe -- Hermes may not find Git Bash."
-    Write-Info "If needed, set HERMES_GIT_BASH_PATH manually to your bash.exe path."
+    Write-Warn "Could not locate bash.exe -- Aakalan may not find Git Bash."
+    Write-Info "If needed, set the Git Bash path and re-run the installer."
 }
 
 # The dependency tree's real Node floor is >=22.22.0, set by react-router 8.3.0
@@ -1589,7 +1589,7 @@ function Test-Node {
             $script:HasNode = $true
             return $true
         }
-        Write-Warn "Node.js $version is too old (Hermes requires Node >=26)"
+        Write-Warn "Node.js $version is too old (Aakalan requires Node >=26)"
     }
 
     # Prefer a Hermes-managed Node from a previous run over a too-old system one.
@@ -1598,7 +1598,7 @@ function Test-Node {
         $version = & $managedNode --version
         $env:Path = "$HermesHome\node;$env:Path"
         Set-ManagedNodeFirstOnUserPath "$HermesHome\node"
-        Write-Success "Node.js $version found (Hermes-managed)"
+        Write-Success "Node.js $version found (Aakalan-managed)"
         # A tree from an older install still has that Node major's bundled
         # npm, which is below the current engines.npm floor. No-ops when the
         # npm is already in range, so reruns cost one --version probe.
@@ -1607,7 +1607,7 @@ function Test-Node {
         return $true
     }
 
-    Write-Info "Installing Hermes-managed Node.js $NodeVersion LTS..."
+    Write-Info "Installing Aakalan-managed Node.js $NodeVersion LTS..."
 
     # Try the portable-zip path FIRST -- no UAC, no admin, no winget MSI.
     # winget install OpenJS.NodeJS.LTS triggers a system-wide MSI install
@@ -1671,7 +1671,7 @@ function Test-Node {
                     try {
                         Rename-Item "$HermesHome\node" $backup -ErrorAction Stop
                     } catch {
-                        Write-Warn "Hermes-managed Node.js is in use by a running app; deferring its upgrade. Close the app and re-run the update."
+                        Write-Warn "Aakalan-managed Node.js is in use by a running app; deferring its upgrade. Close the app and re-run the update."
                         Remove-Item -Recurse -Force $staged -ErrorAction SilentlyContinue
                         Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
                         Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
@@ -2170,7 +2170,7 @@ function Install-Repository {
                         if (($restoreExit -eq 0) -and ($conflictedFiles.Count -eq 0)) {
                             git -c windows.appendAtomically=false stash drop $autostashRef 2>$null
                             Write-Warn "Local changes were restored on top of the updated codebase."
-                            Write-Warn "Review git diff / git status if Hermes behaves unexpectedly."
+                            Write-Warn "Review git diff / git status if Aakalan behaves unexpectedly."
                         } else {
                             Write-Err "Update pulled new code, but restoring local changes hit conflicts."
                             foreach ($line in $restoreOutput) {
@@ -2446,7 +2446,7 @@ function Install-Venv {
         # gateway into the replacement venv.
         if ($env:OS -eq "Windows_NT") {
             $myPid = $PID
-            Write-Info "Stopping any running hermes processes before recreating venv..."
+            Write-Info "Stopping any running Aakalan processes before recreating venv..."
             # Disarm the respawner FIRST: the gateway autostart Scheduled Task
             # relaunches a killed gateway within seconds, and losing that race
             # re-locks the venv's .pyd files between our kill sweep and
@@ -3240,7 +3240,7 @@ function Install-NodeDeps {
     $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
     if (-not $npmCmd) {
         Write-Warn "npm not found on PATH -- skipping Node.js dependencies."
-        Write-Info "Open a new PowerShell window and re-run 'hermes setup tools' later."
+        Write-Info "Open a new PowerShell window and re-run 'aakalan setup tools' later."
         return
     }
     $npmExe = $npmCmd.Source
@@ -4218,7 +4218,7 @@ function Invoke-SetupWizard {
         # The setup wizard prompts for API keys, model choice, persona, etc.
         # Non-interactive callers (GUI installer) own that UX themselves; let
         # them drive it after install.ps1 returns.
-        Write-Info "Skipping setup wizard (non-interactive). Configure via the GUI or 'hermes setup'."
+        Write-Info "Skipping setup wizard (non-interactive). Configure via the GUI or 'aakalan setup'."
         return
     }
 
@@ -4291,7 +4291,7 @@ function Start-GatewayIfConfigured {
     # services on the build agent, etc.).  Treat it like the user declined.
     if ($NonInteractive) {
         Write-Info "Skipping gateway autostart prompt (non-interactive)."
-        Write-Info "Start the gateway later with: hermes gateway"
+        Write-Info "Start the gateway later with: aakalan gateway"
         return
     }
 
@@ -4309,10 +4309,10 @@ function Start-GatewayIfConfigured {
             Write-Info "Logs: $logFile"
             Write-Info "To stop: close the gateway process from Task Manager"
         } catch {
-            Write-Warn "Failed to start gateway. Run manually: hermes gateway"
+            Write-Warn "Failed to start gateway. Run manually: aakalan gateway"
         }
     } else {
-        Write-Info "Skipped. Start the gateway later with: hermes gateway"
+        Write-Info "Skipped. Start the gateway later with: aakalan gateway"
     }
 }
 
@@ -4333,24 +4333,24 @@ function Write-Completion {
     Write-Host "   Data:      " -NoNewline -ForegroundColor Yellow
     Write-Host "$HermesHome\cron\, sessions\, logs\"
     Write-Host "   Code:      " -NoNewline -ForegroundColor Yellow
-    Write-Host "$HermesHome\hermes-agent\"
+    Write-Host "$HermesHome\aakalan-cli\"
     Write-Host ""
     
     Write-Host "---------------------------------------------------------" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "* Commands:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "   hermes              " -NoNewline -ForegroundColor Green
+    Write-Host "   aakalan              " -NoNewline -ForegroundColor Green
     Write-Host "Start chatting"
-    Write-Host "   hermes setup        " -NoNewline -ForegroundColor Green
+    Write-Host "   aakalan setup        " -NoNewline -ForegroundColor Green
     Write-Host "Configure API keys & settings"
-    Write-Host "   hermes config       " -NoNewline -ForegroundColor Green
+    Write-Host "   aakalan config       " -NoNewline -ForegroundColor Green
     Write-Host "View/edit configuration"
-    Write-Host "   hermes config edit  " -NoNewline -ForegroundColor Green
+    Write-Host "   aakalan config edit  " -NoNewline -ForegroundColor Green
     Write-Host "Open config in editor"
-    Write-Host "   hermes gateway      " -NoNewline -ForegroundColor Green
+    Write-Host "   aakalan gateway      " -NoNewline -ForegroundColor Green
     Write-Host "Start messaging gateway (Telegram, Discord, etc.)"
-    Write-Host "   hermes update       " -NoNewline -ForegroundColor Green
+    Write-Host "   aakalan update       " -NoNewline -ForegroundColor Green
     Write-Host "Update to latest version"
     Write-Host ""
     
@@ -4761,7 +4761,7 @@ try {
     Write-Err "Installation failed: $_"
     Write-Host ""
     Write-Info "If the error is unclear, try downloading and running the script directly:"
-    Write-Host "  Invoke-WebRequest -Uri 'https://hermes-agent.nousresearch.com/install.ps1' -OutFile install.ps1" -ForegroundColor Yellow
+    Write-Host "  Invoke-WebRequest -Uri 'https://aakalaninfra.com/install.ps1' -OutFile install.ps1" -ForegroundColor Yellow
     Write-Host "  .\install.ps1" -ForegroundColor Yellow
     Write-Host ""
 }
