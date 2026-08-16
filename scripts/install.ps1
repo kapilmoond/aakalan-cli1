@@ -454,7 +454,7 @@ function Write-Banner {
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host "|             * Aakalan Agent Installer                   |" -ForegroundColor Cyan
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Cyan
-    Write-Host "|  Aaklan Infra Consultancy — local AI work agent         |" -ForegroundColor Cyan
+    Write-Host "|  Aaklan Infra Consultancy - local AI work agent         |" -ForegroundColor Cyan
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host ""
 }
@@ -3036,7 +3036,7 @@ function Set-PathVariable {
     if ($NoVenv) {
         $hermesBin = "$InstallDir"
     } else {
-        # Expose ONLY Aakalan launchers on PATH. Never put hermes.exe here —
+        # Expose ONLY Aakalan launchers on PATH. Never put hermes.exe here --
         # that would replace the official Hermes CLI if both are installed.
         $hermesBin = "$InstallDir\bin"
         New-Item -ItemType Directory -Force -Path $hermesBin | Out-Null
@@ -3072,7 +3072,7 @@ function Set-PathVariable {
     }
     
     # Keep Aakalan separate from official Hermes.
-    # Never overwrite User HERMES_HOME — that belongs to Hermes CLI.
+    # Never overwrite User HERMES_HOME -- that belongs to Hermes CLI.
     [Environment]::SetEnvironmentVariable("AAKALAN_HOME", $HermesHome, "User")
     $env:AAKALAN_HOME = $HermesHome
     $env:HERMES_HOME = $HermesHome
