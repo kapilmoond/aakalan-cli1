@@ -351,6 +351,7 @@ if ($script:NormalizedProfilePaths) {
     # this bug class, and the whole question once a short alias is in play.
     Write-PathDiag "resolved install paths: AakalanHome=$HermesHome InstallDir=$InstallDir"
 }
+Remove-ForeignHermesFromSessionPath
 
 # Captured here, where the values are final, and emitted from the entry-point
 # dispatch at the bottom (alongside -ProtocolVersion / -Manifest) so
@@ -486,6 +487,49 @@ function Invoke-NativeWithRelaxedErrorAction {
     $ErrorActionPreference = "Continue"
     try {
         & $Script
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+}
+
+# Official Hermes CLI lives at %LOCALAPPDATA%\hermes. Aakalan must never
+# reuse its Node/npm or print those paths. AAKALAN_HOME (%LOCALAPPDATA%\aakalan)
+# is a different folder and is allowed.
+function Test-IsForeignHermesPath {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $norm = $Path.Replace('/', '\').ToLowerInvariant()
+    $foreignRoot = (Join-Path $env:LOCALAPPDATA "hermes").Replace('/', '\').ToLowerInvariant()
+    return ($norm -eq $foreignRoot) -or $norm.StartsWith($foreignRoot + '\')
+}
+
+function Remove-ForeignHermesFromSessionPath {
+    $kept = New-Object System.Collections.Generic.List[string]
+    foreach ($p in ($env:Path -split ';')) {
+        if ($p -and -not (Test-IsForeignHermesPath $p)) {
+            $kept.Add($p)
+        }
+    }
+    $env:Path = ($kept -join ';')
+}
+
+function Show-AakalanCliOutput {
+    param($Line)
+    $text = "$Line"
+    $text = $text -replace 'hermes-agent', 'aakalan-agent'
+    $text = $text -replace '(?i)\bHermes\b', 'Aakalan'
+    Write-Host $text
+}
+
+function Invoke-UvForUser {
+    param([string[]]$UvArgs)
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $out = & $UvCmd @UvArgs 2>&1
+        $code = $LASTEXITCODE
+        foreach ($line in $out) { Show-AakalanCliOutput $line }
+        return $code
     } finally {
         $ErrorActionPreference = $prevEAP
     }
@@ -852,7 +896,15 @@ function Install-Uv {
 # from the registry so every Invoke-Stage starts from a fresh, up-to-date
 # PATH view.  Cheap (registry reads, no I/O elsewhere) and idempotent.
 function Sync-EnvPath {
-    $env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $user = [Environment]::GetEnvironmentVariable("Path", "User")
+    $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $kept = New-Object System.Collections.Generic.List[string]
+    foreach ($p in ("$user;$machine" -split ';')) {
+        if ($p -and -not (Test-IsForeignHermesPath $p)) {
+            $kept.Add($p)
+        }
+    }
+    $env:Path = ($kept -join ';')
 }
 
 # npm lifecycle scripts on Windows spawn ``cmd.exe /d /s /c node <script>``.
@@ -864,6 +916,7 @@ function Sync-EnvPath {
 function Ensure-NodeExeOnPath {
     $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
     if (-not $nodeCmd) { return $false }
+    if (Test-IsForeignHermesPath $nodeCmd.Source) { return $false }
 
     $nodeExeDir = Split-Path $nodeCmd.Source -Parent
     if (-not $nodeExeDir) { return $false }
@@ -977,7 +1030,7 @@ function Update-ManagedNpm {
 
     Write-Info "Upgrading bundled npm to satisfy $range ..."
 
-    $tmpCwd = Join-Path $env:TEMP ("hermes-npm-upgrade-" + [Guid]::NewGuid().ToString("N"))
+    $tmpCwd = Join-Path $env:TEMP ("aakalan-npm-upgrade-" + [Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $tmpCwd | Out-Null
     $prevAge = $env:npm_config_min_release_age
     $prevCI = $env:CI
@@ -1581,8 +1634,9 @@ function Test-NodeVersionOk {
 function Test-Node {
     Write-Info "Checking Node.js (for browser tools)..."
 
-    if (Get-Command node -ErrorAction SilentlyContinue) {
-        $version = node --version
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd -and -not (Test-IsForeignHermesPath $nodeCmd.Source)) {
+        $version = & $nodeCmd.Source --version
         if (Test-NodeVersionOk $version) {
             Ensure-NodeExeOnPath | Out-Null
             Write-Success "Node.js $version found"
@@ -1628,7 +1682,7 @@ function Test-Node {
         if ($zipName) {
             $downloadUrl = "${indexUrl}${zipName}"
             $tmpZip = "$env:TEMP\$zipName"
-            $tmpDir = "$env:TEMP\hermes-node-extract"
+            $tmpDir = "$env:TEMP\aakalan-node-extract"
 
             Invoke-WebRequest -Uri $downloadUrl -OutFile $tmpZip -UseBasicParsing
             if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
@@ -2754,8 +2808,8 @@ function Install-Dependencies {
         # in the wrong directory and imports fail with ModuleNotFoundError.
         # (Mirrors the same flag in scripts/install.sh::install_deps.)
         $env:UV_PROJECT_ENVIRONMENT = "$InstallDir\venv"
-        Invoke-NativeWithRelaxedErrorAction { & $UvCmd sync --extra all --locked }
-        if ($LASTEXITCODE -eq 0) {
+        $syncCode = Invoke-UvForUser @('sync', '--extra', 'all', '--locked')
+        if ($syncCode -eq 0) {
             Write-Success "Main package installed (hash-verified via uv.lock)"
             $script:InstalledTier = "hash-verified (uv.lock)"
             # Skip the rest of the tiered cascade -- we already have a
@@ -2829,8 +2883,8 @@ except Exception:
     if (-not $skipPipFallback) {
         foreach ($tier in $installTiers) {
         Write-Info "Trying tier: $($tier.Name) ..."
-        Invoke-NativeWithRelaxedErrorAction { & $UvCmd pip install -e $tier.Spec }
-        if ($LASTEXITCODE -eq 0) {
+        $pipCode = Invoke-UvForUser @('pip', 'install', '-e', $tier.Spec)
+        if ($pipCode -eq 0) {
             Write-Success "Main package installed ($($tier.Name))"
             $script:InstalledTier = $tier.Name
             $installed = $true
@@ -2840,7 +2894,7 @@ except Exception:
         }
     }
     if (-not $installed) {
-        throw "Failed to install hermes-agent package even with no extras. Inspect the uv pip install output above."
+        throw "Failed to install Aakalan Agent package even with no extras. Inspect the uv pip install output above."
     }
 
     # Baseline-import gate. Even if a tier reported success above, the
@@ -3027,7 +3081,7 @@ function Set-PathVariable {
     # Update current session
     $env:Path = "$hermesBin;$env:Path"
     
-    Write-Success "aakalan command ready (Hermes CLI left unchanged)"
+    Write-Success "aakalan command ready"
 }
 
 function Write-BootstrapMarker {
@@ -3104,7 +3158,7 @@ function Write-BootstrapMarker {
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($markerPath, $json, $utf8NoBom)
 
-    Write-Success "Bootstrap marker written: $markerPath"
+    Write-Success "Install complete marker written"
 }
 
 function Copy-ConfigTemplates {
@@ -3237,13 +3291,38 @@ function Install-NodeDeps {
     # Strategy: look next to the npm shim we found and prefer npm.cmd if
     # it exists in the same directory.  Fall back to whatever Get-Command
     # returned if we can't find a .cmd sibling.
+    $npmCandidates = @()
+    $aakalanNpm = Join-Path $HermesHome "node\npm.cmd"
+    if (Test-Path $aakalanNpm) { $npmCandidates += $aakalanNpm }
+    foreach ($sysNpm in @(
+        "$env:ProgramFiles\nodejs\npm.cmd",
+        "${env:ProgramFiles(x86)}\nodejs\npm.cmd",
+        "$env:LOCALAPPDATA\Programs\nodejs\npm.cmd"
+    )) {
+        if (Test-Path $sysNpm) { $npmCandidates += $sysNpm }
+    }
     $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-    if (-not $npmCmd) {
+    if ($npmCmd -and -not (Test-IsForeignHermesPath $npmCmd.Source)) {
+        $src = $npmCmd.Source
+        if ($src -like "*.ps1") {
+            $sib = Join-Path (Split-Path $src -Parent) "npm.cmd"
+            if (Test-Path $sib) { $npmCandidates += $sib } else { $npmCandidates += $src }
+        } else {
+            $npmCandidates += $src
+        }
+    }
+    $npmExe = $null
+    foreach ($cand in $npmCandidates) {
+        if ($cand -and (Test-Path $cand) -and -not (Test-IsForeignHermesPath $cand)) {
+            $npmExe = $cand
+            break
+        }
+    }
+    if (-not $npmExe) {
         Write-Warn "npm not found on PATH -- skipping Node.js dependencies."
         Write-Info "Open a new PowerShell window and re-run 'aakalan setup tools' later."
         return
     }
-    $npmExe = $npmCmd.Source
     if ($npmExe -like "*.ps1") {
         $npmCmdSibling = Join-Path (Split-Path $npmExe -Parent) "npm.cmd"
         if (Test-Path $npmCmdSibling) {
@@ -3379,7 +3458,7 @@ function Install-NodeDeps {
     # Browser tools
     if (Test-Path "$InstallDir\package.json") {
         Write-Info "Installing Node.js dependencies (browser tools)..."
-        $browserLog = "$env:TEMP\hermes-npm-browser-$(Get-Random).log"
+        $browserLog = "$env:TEMP\aakalan-npm-browser-$(Get-Random).log"
         $browserNpmOk = _Run-NpmInstall "Browser tools" $InstallDir $browserLog $npmExe
 
         # Install Playwright Chromium (mirrors scripts/install.sh behaviour for
@@ -3406,7 +3485,7 @@ function Install-NodeDeps {
                 Write-Warn "npx not found -- cannot install Playwright Chromium."
                 Write-Info "Run manually later: cd `"$InstallDir`"; npx playwright install chromium"
             } else {
-                $pwLog = "$env:TEMP\hermes-playwright-install-$(Get-Random).log"
+                $pwLog = "$env:TEMP\aakalan-playwright-install-$(Get-Random).log"
                 Push-Location $InstallDir
                 # Capture EAP outside the try block so the catch's restore call
                 # always has a meaningful value (see Install-Uv for the full
@@ -3488,7 +3567,7 @@ function Install-NodeDeps {
     $tuiDir = "$InstallDir\ui-tui"
     if (Test-Path "$tuiDir\package.json") {
         Write-Info "Installing TUI dependencies..."
-        $tuiLog = "$env:TEMP\hermes-npm-tui-$(Get-Random).log"
+        $tuiLog = "$env:TEMP\aakalan-npm-tui-$(Get-Random).log"
         [void](_Run-NpmInstall "TUI" $tuiDir $tuiLog $npmExe)
     }
 
