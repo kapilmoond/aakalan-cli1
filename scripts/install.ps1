@@ -1550,8 +1550,8 @@ function Set-GitBashEnvVar {
 
     foreach ($candidate in $candidates) {
         if ($candidate -and (Test-Path $candidate)) {
-            [Environment]::SetEnvironmentVariable("HERMES_GIT_BASH_PATH", $candidate, "User")
-            $env:HERMES_GIT_BASH_PATH = $candidate
+            [Environment]::SetEnvironmentVariable("AAKALAN_GIT_BASH_PATH", $candidate, "User")
+            $env:AAKALAN_GIT_BASH_PATH = $candidate
             $script:GitBashPath = $candidate
             Write-Info "Git Bash ready: $candidate"
             return

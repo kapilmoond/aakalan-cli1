@@ -732,7 +732,7 @@ def _find_bash() -> str:
 
     candidates: list[str] = []
 
-    custom = os.environ.get("HERMES_GIT_BASH_PATH")
+    custom = os.environ.get("AAKALAN_GIT_BASH_PATH") or os.environ.get("HERMES_GIT_BASH_PATH")
     if custom and os.path.isfile(custom):
         candidates.append(custom)
 
