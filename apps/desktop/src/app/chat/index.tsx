@@ -9,6 +9,7 @@ import { useLocation } from 'react-router'
 import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
 import { Thread } from '@/components/assistant-ui/thread'
 import { TranscriptWindowProvider } from '@/components/assistant-ui/thread/transcript-window'
+import { BrandMark } from '@/components/brand-mark'
 import { Backdrop } from '@/components/Backdrop'
 import { COMPOSER_HEART_CONFIG, HeartField } from '@/components/chat/vibe-hearts'
 import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
@@ -143,6 +144,11 @@ function ChatHeader({
 
   return (
     <header className={cn(titlebarHeaderBaseClass, isRoutedSessionView && titlebarHeaderShadowClass)}>
+      <BrandMark className="pointer-events-none size-6 shrink-0 rounded-sm shadow-sm" />
+      <span className="pointer-events-none shrink-0 text-[11px] font-semibold tracking-[0.14em] text-[#17324d] uppercase dark:text-[#fdba74]">
+        Aakalan
+      </span>
+      <span className="pointer-events-none h-3.5 w-px shrink-0 bg-(--ui-stroke-secondary)" />
       <div
         className={cn(titlebarHeaderTitleClass, showProfileTag && 'flex items-center')}
         style={{

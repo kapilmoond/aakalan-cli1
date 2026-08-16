@@ -429,9 +429,9 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
   if (state.setupChoice) {
     return (
       <div className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-background/90 p-4 backdrop-blur-md">
-        <div className="w-full max-w-xl rounded-xl border border-(--stroke-nous) bg-card p-8 shadow-nous">
+        <div className="relative w-full max-w-xl overflow-hidden rounded-xl border border-(--stroke-nous) bg-card p-8 pt-10 shadow-nous before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-(--aaklan-strip) before:content-['']">
           <div className="flex items-start gap-4">
-            <BrandMark className="size-11 shrink-0" />
+            <BrandMark className="size-12 shrink-0 rounded-lg shadow-sm" />
             <div className="min-w-0">
               <h2 className="text-xl font-semibold tracking-tight">{copy.settingUpTitle}</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">{copy.installLocalDesc}</p>
