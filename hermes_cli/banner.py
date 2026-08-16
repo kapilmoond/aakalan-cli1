@@ -67,28 +67,46 @@ def _skin_color(key: str, fallback: str) -> str:
 
 from hermes_cli import __version__ as VERSION, __release_date__ as RELEASE_DATE
 
-HERMES_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #FFD700]██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#FFBF00]███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#FFBF00]██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#CD7F32]██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#CD7F32]╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]"""
+try:
+    from aakalan_brand import PRODUCT_NAME as _PRODUCT_NAME
+except Exception:
+    _PRODUCT_NAME = "Aakalan Agent"
 
-HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
-[#FFBF00]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
+# Wide wordmark: "AAKALAN AGENT" (~109 cols). Used only on wide terminals.
+AAKALAN_AGENT_LOGO = """[bold #FFD700] █████╗  █████╗ ██╗  ██╗ █████╗ ██╗      █████╗ ███╗   ██╗        █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
+[bold #FFD700]██╔══██╗██╔══██╗██║ ██╔╝██╔══██╗██║     ██╔══██╗████╗  ██║       ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
+[#FFBF00]███████║███████║█████╔╝ ███████║██║     ███████║██╔██╗ ██║       ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
+[#FFBF00]██╔══██║██╔══██║██╔═██╗ ██╔══██║██║     ██╔══██║██║╚██╗██║       ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
+[#CD7F32]██║  ██║██║  ██║██║  ██╗██║  ██║███████╗██║  ██║██║ ╚████║       ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
+[#CD7F32]╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]"""
+
+# Compact wordmark: "AAKALAN" (~58 cols). Fits the 95-col banner gate.
+AAKALAN_WORDMARK = """[bold #FFD700] █████╗  █████╗ ██╗  ██╗ █████╗ ██╗      █████╗ ███╗   ██╗[/]
+[bold #FFD700]██╔══██╗██╔══██╗██║ ██╔╝██╔══██╗██║     ██╔══██╗████╗  ██║[/]
+[#FFBF00]███████║███████║█████╔╝ ███████║██║     ███████║██╔██╗ ██║[/]
+[#FFBF00]██╔══██║██╔══██║██╔═██╗ ██╔══██║██║     ██╔══██║██║╚██╗██║[/]
+[#CD7F32]██║  ██║██║  ██║██║  ██╗██║  ██║███████╗██║  ██║██║ ╚████║[/]
+[#CD7F32]╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝[/]"""
+
+# Compat alias — old imports still resolve, but never render HERMES letters.
+HERMES_AGENT_LOGO = AAKALAN_WORDMARK
+
+# Triangle-A mark (Aaklan Infra Consultancy logo), replaces the Hermes caduceus.
+AAKALAN_MARK = """[#1B4F9C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#1B4F9C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#1B4F9C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⠁⠈⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#E87722]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⠁⠀⠀⠈⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#E87722]⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣤⣤⣤⣤⣤⣤⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#1B4F9C]⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⠁⠀⠀⠀⠀⠀⠀⠈⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀[/]
+[#1B4F9C]⠀⠀⠀⠀⠀⠀⢀⣾⣿⠁⠀⠀[#4CAF50]⢀⣀⣀⡀⠀⠀[#1B4F9C]⠈⣿⣷⡀⠀⠀⠀⠀⠀⠀[/]
+[#E87722]⠀⠀⠀⠀⠀⢀⣾⣿⠁⠀⠀[#1B4F9C]⢠⣿⣿⣿⣿⡄⠀⠀[#E87722]⠈⣿⣷⡀⠀⠀⠀⠀⠀[/]
+[#E87722]⠀⠀⠀⠀⢀⣾⣿⠁⠀⠀⠀[#1B4F9C]⣿⣿⣿⣿⣿⣿⠀⠀⠀[#E87722]⠈⣿⣷⡀⠀⠀⠀⠀[/]
+[#1B4F9C]⠀⠀⠀⢀⣾⣿⠁⠀⠀⠀⠀[#4CAF50]⠈⠻⣿⣿⠟⠁⠀⠀⠀⠀[#1B4F9C]⠈⣿⣷⡀⠀⠀⠀[/]
+[#1B4F9C]⠀⠀⢀⣾⣿⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣿⣷⡀⠀⠀[/]
+[#E87722]⠀⠀⠘⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠃⠀⠀[/]
+[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀AAKALAN⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
+
+HERMES_CADUCEUS = AAKALAN_MARK
 
 
 
@@ -122,7 +140,7 @@ def get_available_skills() -> Dict[str, List[str]]:
     skills_by_category: Dict[str, List[str]] = {}
     for skill in all_skills:
         category = skill.get("category") or "general"
-        skills_by_category.setdefault(category, []).append(skill["name"])
+        skills_by_category.setdefault(category, []).append(_display_skill_name(skill["name"]))
     _available_skills_cache = (skills_by_category,)
     return skills_by_category
 
@@ -621,7 +639,7 @@ def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
 
 def format_banner_version_label() -> str:
     """Return the version label shown in the startup banner title."""
-    base = f"Aakalan Agent Agent v{VERSION} ({RELEASE_DATE})"
+    base = f"{_PRODUCT_NAME} v{VERSION} ({RELEASE_DATE})"
     state = get_git_banner_state()
     if not state:
         return base
@@ -776,6 +794,19 @@ def _display_toolset_name(toolset_name: str) -> str:
         if toolset_name.endswith("_tools")
         else toolset_name
     )
+
+
+def _display_skill_name(name: str) -> str:
+    """Show Aakalan names for leftover upstream skill IDs on the splash."""
+    if not name:
+        return name
+    if name == "hermes-agent":
+        return "aakalan-agent"
+    if name.startswith("hermes-agent-"):
+        return "aakalan-agent-" + name[len("hermes-agent-"):]
+    if name.startswith("hermes-"):
+        return "aakalan-" + name[len("hermes-"):]
+    return name.replace("-hermes-", "-aakalan-")
 
 
 # =========================================================================
@@ -1267,8 +1298,15 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
 
     console.print()
     term_width = shutil.get_terminal_size().columns
-    if term_width >= 95:
-        _logo = _bskin.banner_logo if _bskin and hasattr(_bskin, 'banner_logo') and _bskin.banner_logo else HERMES_AGENT_LOGO
-        console.print(_logo)
+    _skin_logo = _bskin.banner_logo if _bskin and hasattr(_bskin, 'banner_logo') and _bskin.banner_logo else ""
+    if _skin_logo:
+        if term_width >= 95:
+            console.print(_skin_logo)
+            console.print()
+    elif term_width >= 114:
+        console.print(AAKALAN_AGENT_LOGO)
+        console.print()
+    elif term_width >= 64:
+        console.print(AAKALAN_WORDMARK)
         console.print()
     console.print(outer_panel)
