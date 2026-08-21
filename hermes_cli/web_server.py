@@ -4276,37 +4276,62 @@ def _validate_messaging_env_value(platform_id: str, key: str, value: str) -> Non
             )
 
 
-def _spawn_gateway_restart(profile: Optional[str] = None) -> Tuple[subprocess.Popen, bool]:
+_GATEWAY_RESTART_FORCE_GEN = 0
+
+
+def _spawn_gateway_restart(
+    profile: Optional[str] = None,
+    *,
+    force_new: bool = False,
+) -> Tuple[subprocess.Popen, bool]:
     """Spawn ``hermes gateway restart``, reusing an in-flight restart.
 
-    Multiple dashboard paths can request a restart in quick succession
-    (restart button double-click, or a stale cached frontend firing its own
-    restart after the server already auto-restarted post-onboarding). Two
-    concurrent ``hermes gateway restart`` children race each other on the
-    manual kill-and-start path, so reuse the live one instead.
-
-    Before spawning, sweep for orphaned gateway processes whose parent has
-    exited (e.g. desktop-app restarts leaving a reparented gateway child
-    under launchd/PPID=1).  Without this the orphan keeps its platform
-    connection alive and the fresh gateway stacks a duplicate (#77276).
-
-    Returns ``(proc, reused)``.
+    ``force_new=True`` is for env-changing paths (WhatsApp apply/disconnect).
+    Reusing a restart that started *before* ``WHATSAPP_ENABLED`` was flipped
+    boots a gateway that never attaches WhatsApp while the UI still says
+    connected.
     """
-    # Reap orphaned gateways before spawning a new one (#77276).
+    global _GATEWAY_RESTART_FORCE_GEN
+
     try:
         from hermes_cli.gateway import _reap_unsupervised_gateway_orphans
 
         _reap_unsupervised_gateway_orphans()
     except Exception:
-        pass  # best-effort — don't block the restart on a reap failure
+        pass
 
     subcommand = _gateway_subcommand(profile, "restart")
     existing = _ACTION_PROCS.get("gateway-restart")
     if existing is not None and existing.poll() is None:
         existing_command = _ACTION_COMMANDS.get("gateway-restart")
-        if existing_command is None or existing_command == tuple(subcommand):
+        same_command = existing_command is None or existing_command == tuple(subcommand)
+        if same_command and not force_new:
             return existing, True
-        raise RuntimeError("gateway restart already in progress for another profile")
+        if not same_command and not force_new:
+            raise RuntimeError("gateway restart already in progress for another profile")
+        _GATEWAY_RESTART_FORCE_GEN += 1
+        my_gen = _GATEWAY_RESTART_FORCE_GEN
+
+        def _followup() -> None:
+            try:
+                existing.wait(timeout=90)
+            except Exception:
+                pass
+            if _GATEWAY_RESTART_FORCE_GEN != my_gen:
+                return
+            _ACTION_PROCS.pop("gateway-restart", None)
+            _ACTION_COMMANDS.pop("gateway-restart", None)
+            try:
+                _spawn_hermes_action(subcommand, "gateway-restart")
+            except Exception:
+                _log.exception("Follow-up gateway restart after env change failed")
+
+        threading.Thread(
+            target=_followup,
+            daemon=True,
+            name="gateway-restart-followup",
+        ).start()
+        return existing, True
     return _spawn_hermes_action(subcommand, "gateway-restart"), False
 
 
@@ -8951,7 +8976,7 @@ def _whatsapp_session_path() -> Path:
 
 
 def _whatsapp_all_session_dirs() -> list[Path]:
-    """Both current and leftover session folders. Disconnect must wipe every one."""
+    """Every WhatsApp session folder, including leftover ``session*.bak`` dirs."""
     from hermes_constants import get_hermes_home
 
     home = get_hermes_home()
@@ -8960,6 +8985,14 @@ def _whatsapp_all_session_dirs() -> list[Path]:
         home / "whatsapp" / "session",
         _whatsapp_session_path(),
     ]
+    for parent in (home / "platforms" / "whatsapp", home / "whatsapp"):
+        try:
+            if parent.is_dir():
+                for child in parent.iterdir():
+                    if child.is_dir() and child.name.startswith("session"):
+                        candidates.append(child)
+        except OSError:
+            pass
     unique: list[Path] = []
     seen: set[str] = set()
     for path in candidates:
@@ -9037,6 +9070,30 @@ def _rmtree_retry(path: Path, attempts: int = 8) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
+def _wait_until_whatsapp_bridges_gone(timeout_s: float = 8.0) -> None:
+    """Pair-only Node still holds creds.json on Windows until it fully exits."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        leftover = False
+        try:
+            import psutil
+
+            for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+                try:
+                    cmdline = proc.info.get("cmdline") or []
+                except Exception:
+                    continue
+                joined = " ".join(str(part) for part in cmdline).lower()
+                if "bridge.js" in joined and "whatsapp" in joined:
+                    leftover = True
+                    break
+        except Exception:
+            leftover = False
+        if not leftover:
+            return
+        time.sleep(0.25)
+
+
 def _wipe_whatsapp_identity() -> None:
     """Forget the linked phone: kill the bridge, delete session files, clear allowlist."""
     with _whatsapp_onboarding_lock:
@@ -9048,6 +9105,8 @@ def _wipe_whatsapp_identity() -> None:
 
     for session_path in _whatsapp_all_session_dirs():
         _kill_whatsapp_bridge_processes(session_path)
+    _wait_until_whatsapp_bridges_gone()
+    for session_path in _whatsapp_all_session_dirs():
         _rmtree_retry(session_path)
 
     try:
@@ -9056,6 +9115,16 @@ def _wipe_whatsapp_identity() -> None:
         save_env_value("WHATSAPP_ALLOWED_USERS", "")
     try:
         remove_env_value("WHATSAPP_ALLOW_FROM")
+    except Exception:
+        pass
+    # Keep the gateway alive during QR setup. Apply turns WhatsApp back on
+    # and force-restarts the gateway so the new phone is the one that replies.
+    try:
+        save_env_value("WHATSAPP_ENABLED", "false")
+    except Exception:
+        pass
+    try:
+        _write_platform_enabled("whatsapp", False)
     except Exception:
         pass
 
@@ -9394,9 +9463,13 @@ def _whatsapp_onboarding_payload(pairing_id: str, record: _WhatsAppOnboardingSes
     }
 
 
-def _restart_gateway_after_whatsapp_onboarding(profile: Optional[str] = None) -> dict[str, Any]:
+def _restart_gateway_after_whatsapp_onboarding(
+    profile: Optional[str] = None,
+    *,
+    force_new: bool = False,
+) -> dict[str, Any]:
     try:
-        proc, reused = _spawn_gateway_restart(profile)
+        proc, reused = _spawn_gateway_restart(profile, force_new=force_new)
     except Exception as exc:
         _log.exception("Failed to auto-restart gateway after WhatsApp onboarding")
         return {
@@ -9513,10 +9586,19 @@ async def apply_whatsapp_onboarding(
         if mode == "self-chat" and not allowed_users:
             allowed_users = record.account_phone or record.account_id or ""
         record_profile = record.profile
+        pairing_proc = record.proc
+
+    _terminate_whatsapp_pairing(pairing_proc)
+    _wait_until_whatsapp_bridges_gone()
 
     effective_profile = body.profile or profile or record_profile
     try:
         with _config_profile_scope(effective_profile):
+            if not allowed_users:
+                _sid, _sname, scanned_phone = _whatsapp_linked_account_from_session(
+                    _whatsapp_session_path()
+                )
+                allowed_users = scanned_phone or _sid or ""
             save_env_value("WHATSAPP_MODE", mode)
             if mode == "self-chat":
                 save_env_value("WHATSAPP_DM_POLICY", "allowlist")
@@ -9541,7 +9623,10 @@ async def apply_whatsapp_onboarding(
         _whatsapp_onboarding_sessions.pop(pairing_id, None)
         _persist_whatsapp_onboarding_sessions()
 
-    restart_result = _restart_gateway_after_whatsapp_onboarding(effective_profile)
+    restart_result = _restart_gateway_after_whatsapp_onboarding(
+        effective_profile,
+        force_new=True,
+    )
     return {
         "ok": True,
         "platform": "whatsapp",
@@ -9575,7 +9660,10 @@ async def disconnect_whatsapp(profile: Optional[str] = None):
         _log.exception("WhatsApp disconnect failed")
         raise HTTPException(status_code=500, detail="Failed to disconnect WhatsApp.") from exc
 
-    restart_result = _restart_gateway_after_whatsapp_onboarding(effective_profile)
+    restart_result = _restart_gateway_after_whatsapp_onboarding(
+        effective_profile,
+        force_new=True,
+    )
     return {
         "ok": True,
         "platform": "whatsapp",
@@ -9626,7 +9714,7 @@ async def upsert_email_account(body: EmailAccountUpsert):
         _log.exception("Email account save failed")
         raise HTTPException(status_code=500, detail="Failed to save the email account.") from exc
 
-    restart_result = _restart_gateway_after_whatsapp_onboarding(profile)
+    restart_result = _restart_gateway_after_whatsapp_onboarding(profile, force_new=True)
     return {
         "ok": True,
         "account": public_account(account),
@@ -9644,7 +9732,7 @@ async def delete_email_account(account_id: str, profile: Optional[str] = None):
             raise HTTPException(status_code=404, detail="That email account was not found.")
         _email_disable_if_empty()
         remaining = [public_account(item) for item in load_accounts()]
-    restart_result = _restart_gateway_after_whatsapp_onboarding(profile)
+    restart_result = _restart_gateway_after_whatsapp_onboarding(profile, force_new=True)
     return {"ok": True, "accounts": remaining, **restart_result}
 
 
